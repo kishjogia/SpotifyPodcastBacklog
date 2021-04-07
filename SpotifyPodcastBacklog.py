@@ -6,11 +6,19 @@
 import json
 import spotipy
 
+class podcast_show:
+    podcast_id = "1234"
+    total_episodes = "1234"
+    episode_name = []
+    episode_ids = []
+
+# Define podcast show
+podcast = podcast_show()
+
 ID = "123"
 SECRET = "123"
 username = "name"
 scope = "user-library-read user-read-playback-position playlist-modify-public playlist-modify-private"
-
 
 def read_secret():
     with open('secret.json') as json_file:
@@ -45,31 +53,57 @@ def get_podcasts(sp):
     
     select_list = input("Select the Podcast to use: ")
 
-    return sp_show_id[int(select_list)]
+    # Get the podcast ID
+    podcast.podcast_id = sp_show_id[int(select_list)]
+    
+    # Get the total number of episodes
+    result = sp.show(podcast.podcast_id)
+    podcast.total_episodes = result['total_episodes']
+
+    return
 
 def get_episodes(sp):
     # Get a list of subscibed podcasts
-    show_id = get_podcasts(sp)
+    get_podcasts(sp)
+
+    episode_offset = 0
+
+    #print("Total Episodes: " + str(podcast.total_episodes))
 
     # Get list of episodes
-    episodes = sp.show_episodes(show_id)
+    if podcast.total_episodes < 50:
+        episodes = sp.show_episodes(podcast.podcast_id)
 
-    episode_ids = []
+        for episode in episodes['items']:
+            podcast.episode_ids.append(episode['uri'])
 
-    for episode in episodes['items']:
-        episode_ids.append(episode['uri'])
+    else:
+        while episode_offset < podcast.total_episodes:
+            episodes = sp.show_episodes(podcast.podcast_id, offset=episode_offset)
 
-    return episode_ids
+            for episode in episodes['items']:
+                podcast.episode_ids.append(episode['uri'])
 
-def add_backlog(sp, episode_list):
+            episode_offset = episode_offset + 50
+            #print ("Current offset: " + episode_offset)
+
+    return
+
+def add_backlog(sp):
     # Create a new playlist
     result = sp.user_playlist_create(username, "Podcast Backlog")
     playlist_id = result['id']
 
     #episode_list.reverse()
 
-    sp.playlist_add_items(playlist_id, episode_list)
+    offset = 0
 
+    if podcast.total_episodes < 50:
+        sp.playlist_add_items(playlist_id, podcast.episode_ids)
+    else:
+        while offset < podcast.total_episodes:
+            sp.playlist_add_items(playlist_id, podcast.episode_ids[offset:offset+50])
+            offset = offset + 50
     return
 
 if __name__ == '__main__':
@@ -82,15 +116,7 @@ if __name__ == '__main__':
     sp = spotify_authentication()
 
     # Get a episodes in from choosen podcast
-    episodes = get_episodes(sp)
+    get_episodes(sp)
 
     # Add backlog episodes to playlist
-    add_backlog(sp, episodes)
-    
-
-    # Get the tracks in the playlist
-    #results = sp.playlist_items(ava_playlists)
-    #print (json.dumps(results, indent=4))
-    
-    #episode_played(sp, ava_playlists, results)
-
+    add_backlog(sp)
